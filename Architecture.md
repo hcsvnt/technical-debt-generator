@@ -70,3 +70,4 @@ The app uses a Bun server with SQLite for persistence and a React/Tailwind/Shadc
 
 ## Deployment
 - Local Bun process serving API and static frontend assets.
+`
