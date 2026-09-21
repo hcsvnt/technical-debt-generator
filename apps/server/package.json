@@ -10,6 +10,7 @@
     "db:migrate": "bun run src/db/migrate.ts"
   },
   "dependencies": {
+    "@todo/shared": "workspace:*",
     "drizzle-orm": "^0.45.3",
     "zod": "^4.6.5"
   },
