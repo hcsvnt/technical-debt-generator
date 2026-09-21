@@ -1,21 +1,21 @@
-# bun-react-tailwind-shadcn-template
+# Todo Notes
 
-To install dependencies:
+A single-user todo app. Bun server, SQLite via Drizzle, React 19 front end —
+all served from one process.
 
 ```bash
 bun install
+bun run dev     # http://localhost:3000
 ```
 
-To start a development server:
+| | |
+|---|---|
+| Technical documentation | [`docs/`](docs/) |
+| Product requirements | [`PRD.md`](PRD.md) |
+| Scripts, migrations, tests | [`docs/development.md`](docs/development.md) |
 
-```bash
-bun dev
 ```
-
-To run for production:
-
-```bash
-bun start
+apps/server/     Bun.serve routes, Drizzle, migrations
+apps/web/        React, TanStack Query, react-hook-form, shadcn
+packages/shared/ Zod schemas shared by both
 ```
-
-This project was created using `bun init` in bun v1.3.6. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
