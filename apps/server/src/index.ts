@@ -2,7 +2,7 @@ import { serve } from "bun";
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "fs";
 import path from "path";
-import index from "./index.html";
+import index from "../../web/src/index.html";
 
 type TodoRow = {
   id: number;
