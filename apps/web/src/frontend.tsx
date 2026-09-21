@@ -1,18 +1,30 @@
 /**
- * This file is the entry point for the React app, it sets up the root
- * element and renders the App component to the DOM.
- *
- * It is included in `src/index.html`.
+ * Entry point for the React app: sets up the root element, the Query client,
+ * and renders App. Referenced from src/index.html.
  */
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+
 import { App } from "./App";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // A single-user local app; refetching on every focus is noise.
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </StrictMode>
 );
 
@@ -21,6 +33,5 @@ if (import.meta.hot) {
   const root = (import.meta.hot.data.root ??= createRoot(elem));
   root.render(app);
 } else {
-  // The hot module reloading API is not available in production.
   createRoot(elem).render(app);
 }

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import type { Todo, TodoErrors } from "@todo/shared";
+
 import { createDb } from "../db/client";
 import { todos as todosTable } from "../db/schema";
 import { createTodoRoutes } from "./todos";
@@ -10,6 +12,12 @@ let db: ReturnType<typeof createDb>["db"];
 let routes: Routes;
 
 const valid = { title: "Ship it", description: "All of it", dueDate: "2026-09-30" };
+
+/** Response.json() is `unknown`; these keep the assertions readable. */
+const readList = async (res: Response) => ((await res.json()) as { data: Todo[] }).data;
+const readOne = async (res: Response) => ((await res.json()) as { data: Todo }).data;
+const readErrors = async (res: Response) => ((await res.json()) as { errors: TodoErrors }).errors;
+const titles = (todos: Todo[]) => todos.map((todo) => todo.title);
 
 const get = (query = "") =>
   routes.list(new Request(`http://localhost/api/todos${query}`));
@@ -66,47 +74,42 @@ beforeEach(() => {
 
 describe("GET /api/todos", () => {
   test("returns an empty list when there is nothing", async () => {
-    expect(await (await get()).json()).toEqual({ data: [] });
+    expect(await readList(await get())).toEqual([]);
   });
 
   test("excludes soft-deleted todos", async () => {
     seed({ title: "visible" });
     seed({ title: "gone", deletedAt: "2026-02-01T00:00:00.000Z" });
 
-    const { data } = await (await get()).json();
-    expect(data.map((t: { title: string }) => t.title)).toEqual(["visible"]);
+    expect(titles(await readList(await get()))).toEqual(["visible"]);
   });
 
   test("filter=active hides completed todos", async () => {
     seed({ title: "open" });
     seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
 
-    const { data } = await (await get("?filter=active")).json();
-    expect(data.map((t: { title: string }) => t.title)).toEqual(["open"]);
+    expect(titles(await readList(await get("?filter=active")))).toEqual(["open"]);
   });
 
   test("filter=completed hides active todos", async () => {
     seed({ title: "open" });
     seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
 
-    const { data } = await (await get("?filter=completed")).json();
-    expect(data.map((t: { title: string }) => t.title)).toEqual(["done"]);
+    expect(titles(await readList(await get("?filter=completed")))).toEqual(["done"]);
   });
 
   test("filter=all returns both", async () => {
     seed({ title: "open" });
     seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
 
-    const { data } = await (await get("?filter=all")).json();
-    expect(data).toHaveLength(2);
+    expect(await readList(await get("?filter=all"))).toHaveLength(2);
   });
 
   test("a soft-deleted todo stays hidden under every filter", async () => {
     seed({ title: "gone", completedAt: "2026-02-01T00:00:00.000Z", deletedAt: "2026-02-02T00:00:00.000Z" });
 
     for (const filter of ["all", "active", "completed"]) {
-      const { data } = await (await get(`?filter=${filter}`)).json();
-      expect(data).toEqual([]);
+      expect(await readList(await get(`?filter=${filter}`))).toEqual([]);
     }
   });
 
@@ -116,12 +119,12 @@ describe("GET /api/todos", () => {
 
     const res = await get("?filter=nonsense");
     expect(res.status).toBe(200);
-    expect((await res.json()).data).toHaveLength(2);
+    expect(await readList(res)).toHaveLength(2);
   });
 
   test("a missing filter param behaves as all", async () => {
     seed({ title: "open" });
-    expect((await (await get()).json()).data).toHaveLength(1);
+    expect(await readList(await get())).toHaveLength(1);
   });
 
   test("sorts incomplete first, then dueDate, then createdAt", async () => {
@@ -130,8 +133,7 @@ describe("GET /api/todos", () => {
     seed({ title: "early-b", dueDate: "2026-03-01", createdAt: "2026-01-02T00:00:00.000Z" });
     seed({ title: "early-a", dueDate: "2026-03-01", createdAt: "2026-01-01T00:00:00.000Z" });
 
-    const { data } = await (await get()).json();
-    expect(data.map((t: { title: string }) => t.title)).toEqual([
+    expect(titles(await readList(await get()))).toEqual([
       "early-a",
       "early-b",
       "late",
@@ -145,14 +147,13 @@ describe("POST /api/todos", () => {
     const res = await post(valid);
     expect(res.status).toBe(201);
 
-    const { data } = await res.json();
+    const data = await readOne(res);
     expect(data).toMatchObject({ ...valid, completedAt: null, deletedAt: null });
     expect(data.createdAt).toBe(data.updatedAt);
   });
 
   test("trims whitespace before storing", async () => {
-    const { data } = await (await post({ ...valid, title: "  padded  " })).json();
-    expect(data.title).toBe("padded");
+    expect((await readOne(await post({ ...valid, title: "  padded  " }))).title).toBe("padded");
   });
 
   test.each([
@@ -164,18 +165,18 @@ describe("POST /api/todos", () => {
   ])("rejects %s with a field error", async (_label, body, field) => {
     const res = await post(body);
     expect(res.status).toBe(400);
-    expect((await res.json()).errors).toHaveProperty(field);
+    expect(await readErrors(res)).toHaveProperty(field);
   });
 
   test("rejects malformed JSON with a form error", async () => {
     const res = await post("{not json");
     expect(res.status).toBe(400);
-    expect((await res.json()).errors.form).toBe("Invalid JSON payload.");
+    expect((await readErrors(res)).form).toBe("Invalid JSON payload.");
   });
 
   test("does not persist a rejected todo", async () => {
     await post({ ...valid, title: "" });
-    expect((await (await get()).json()).data).toEqual([]);
+    expect(await readList(await get())).toEqual([]);
   });
 });
 
@@ -185,32 +186,32 @@ describe("PUT /api/todos/:id", () => {
     const res = await put(String(created.id), { ...valid, title: "after" });
 
     expect(res.status).toBe(200);
-    const { data } = await res.json();
+    const data = await readOne(res);
     expect(data.title).toBe("after");
     expect(data.updatedAt).not.toBe(created.updatedAt);
   });
 
   test("completed:true stamps completedAt", async () => {
     const created = seed({ title: "open" });
-    const { data } = await (await put(String(created.id), { ...valid, completed: true })).json();
+    const data = await readOne(await put(String(created.id), { ...valid, completed: true }));
     expect(data.completedAt).not.toBeNull();
   });
 
   test("completed:false clears completedAt", async () => {
     const created = seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
-    const { data } = await (await put(String(created.id), { ...valid, completed: false })).json();
+    const data = await readOne(await put(String(created.id), { ...valid, completed: false }));
     expect(data.completedAt).toBeNull();
   });
 
   test("omitting completed leaves completion untouched", async () => {
     const created = seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
-    const { data } = await (await put(String(created.id), valid)).json();
+    const data = await readOne(await put(String(created.id), valid));
     expect(data.completedAt).toBe("2026-02-01T00:00:00.000Z");
   });
 
   test("completing an already-complete todo keeps the original timestamp", async () => {
     const created = seed({ title: "done", completedAt: "2026-02-01T00:00:00.000Z" });
-    const { data } = await (await put(String(created.id), { ...valid, completed: true })).json();
+    const data = await readOne(await put(String(created.id), { ...valid, completed: true }));
     expect(data.completedAt).toBe("2026-02-01T00:00:00.000Z");
   });
 
@@ -218,7 +219,7 @@ describe("PUT /api/todos/:id", () => {
     const created = seed({ title: "open" });
     const res = await put(String(created.id), { ...valid, title: "" });
     expect(res.status).toBe(400);
-    expect((await res.json()).errors.title).toBe("Title is required.");
+    expect((await readErrors(res)).title).toBe("Title is required.");
   });
 
   test("404s for a missing todo", async () => {
@@ -240,7 +241,7 @@ describe("DELETE /api/todos/:id", () => {
     const created = seed({ title: "doomed" });
     expect((await del(String(created.id))).status).toBe(200);
 
-    expect((await (await get()).json()).data).toEqual([]);
+    expect(await readList(await get())).toEqual([]);
     expect(db.select().from(todosTable).all()).toHaveLength(1);
   });
 
@@ -250,7 +251,7 @@ describe("DELETE /api/todos/:id", () => {
 
     const res = await del(String(created.id));
     expect(res.status).toBe(404);
-    expect((await res.json()).errors.form).toBe("Todo not found.");
+    expect((await readErrors(res)).form).toBe("Todo not found.");
   });
 
   test("404s for a todo that never existed", async () => {

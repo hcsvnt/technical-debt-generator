@@ -1,4 +1,4 @@
-import type { Todo } from '@/types/todo';
+import type { Todo } from '@todo/shared';
 import { TodoCard } from '@/components/todo/TodoCard';
 
 type TodoListProps = {

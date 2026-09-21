@@ -1,19 +1,19 @@
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type TodoEmptyStateProps = {
-    loading: boolean;
-    error: string | null;
-    message: string;
+  title: string;
+  message: string;
+  tone?: "muted" | "destructive";
 };
 
-export function TodoEmptyState({ loading, error, message }: TodoEmptyStateProps) {
-    return (
-        <Card className={cn('border-dashed', error ? 'border-destructive' : '')}>
-            <CardHeader>
-                <CardTitle className="text-lg">{loading ? 'Loading' : error ? 'Error' : 'Nothing here'}</CardTitle>
-                <CardDescription>{message}</CardDescription>
-            </CardHeader>
-        </Card>
-    );
+export function TodoEmptyState({ title, message, tone = "muted" }: TodoEmptyStateProps) {
+  return (
+    <Card className={cn("border-dashed", tone === "destructive" && "border-destructive")}>
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardDescription>{message}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
 }

@@ -4,12 +4,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { Todo } from '@/types/todo';
+import type { Todo } from '@todo/shared';
+
+// Built once, not per card per render: toLocaleDateString with an options
+// object constructs a new Intl.DateTimeFormat on every call.
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+});
 
 const formatDisplayDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return dateFormatter.format(date);
 };
 
 type TodoCardProps = {
@@ -41,7 +49,7 @@ export function TodoCard({ todo, onEdit, onToggleComplete, onDelete }: TodoCardP
             </CardContent>
             <CardFooter className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => onEdit(todo)}>
-                <PencilIcon className="size-4" />
+                    <PencilIcon className="size-4" />
                     Edit
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => onToggleComplete(todo)}>

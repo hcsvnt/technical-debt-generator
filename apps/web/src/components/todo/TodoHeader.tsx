@@ -2,7 +2,7 @@ import { PlusIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { TodoFilter } from '@/types/todo';
+import type { TodoFilter } from '@todo/shared';
 
 type TodoHeaderProps = {
     filter: TodoFilter;

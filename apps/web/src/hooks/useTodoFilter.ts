@@ -1,35 +1,45 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useSyncExternalStore } from "react";
 
-import type { TodoFilter } from '@/types/todo';
+import { todoFilterSchema, type TodoFilter } from "@todo/shared";
 
-const DEFAULT_FILTER: TodoFilter = 'all';
-const allowedFilters = new Set<TodoFilter>(['all', 'active', 'completed']);
+/**
+ * The URL is the single source of truth for the filter.
+ *
+ * Subscribing to popstate is what makes the Back button work: previously the
+ * filter was pushed onto the history stack but never read back, so going Back
+ * changed the URL and left the UI showing the old filter.
+ */
 
-const getFilterFromUrl = (): TodoFilter => {
-    if (typeof window === 'undefined') return DEFAULT_FILTER;
-    const params = new URLSearchParams(window.location.search);
-    const paramFilter = params.get('filter');
-    if (paramFilter && allowedFilters.has(paramFilter as TodoFilter)) {
-        return paramFilter as TodoFilter;
-    }
-    return DEFAULT_FILTER;
-};
+const FILTER_CHANGED = "todo:filterchange";
+
+function subscribe(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  window.addEventListener(FILTER_CHANGED, onChange);
+  return () => {
+    window.removeEventListener("popstate", onChange);
+    window.removeEventListener(FILTER_CHANGED, onChange);
+  };
+}
+
+const readFilter = (): TodoFilter =>
+  todoFilterSchema.parse(new URLSearchParams(window.location.search).get("filter"));
 
 export function useTodoFilter() {
-    const [filter, setFilter] = useState<TodoFilter>(() => getFilterFromUrl());
+  const filter = useSyncExternalStore(subscribe, readFilter, () => "all" as const);
 
-    const updateFilter = useCallback((value: TodoFilter) => {
-        setFilter(value);
-        if (typeof window === 'undefined') return;
-        const params = new URLSearchParams(window.location.search);
-        if (value === 'all') {
-            params.delete('filter');
-        } else {
-            params.set('filter', value);
-        }
-        const newUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
-        window.history.pushState({}, '', newUrl);
-    }, []);
+  const setFilter = useCallback((value: TodoFilter) => {
+    const params = new URLSearchParams(window.location.search);
+    if (value === "all") {
+      params.delete("filter");
+    } else {
+      params.set("filter", value);
+    }
 
-    return { filter, updateFilter };
+    const query = params.toString();
+    window.history.pushState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    // pushState does not fire popstate, so nudge our own subscribers.
+    window.dispatchEvent(new Event(FILTER_CHANGED));
+  }, []);
+
+  return { filter, setFilter };
 }

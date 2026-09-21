@@ -38,3 +38,6 @@ data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# playwright mcp scratch
+.playwright-mcp
